@@ -1,0 +1,274 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Building2,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  Filter,
+  Globe,
+  Search
+} from "lucide-react";
+import type { TenderApiResponse, TenderRecord } from "@/lib/types";
+
+const CURRENT_YEAR = 2026;
+const YEARS = Array.from({ length: CURRENT_YEAR - 2019 + 1 }, (_, i) => CURRENT_YEAR - i);
+const PAGE_SIZE = 100;
+
+function money(value: unknown) {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = Number(String(value).replace(/,/g, ""));
+  if (Number.isNaN(n)) return String(value);
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n)} ₮`;
+}
+
+function dateText(value?: string) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit"
+  }).format(d);
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stat">
+      <div className="label">{label}</div>
+      <div className="value">{value}</div>
+    </div>
+  );
+}
+
+function TenderCard({ item }: { item: TenderRecord }) {
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div>
+          <div className="label" style={{ textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {item.tenderTypeName || "Tender"}
+          </div>
+          <h3 className="h3" style={{ marginTop: 8 }}>{item.tenderName || "Untitled tender"}</h3>
+          <div className="muted" style={{ marginTop: 10, fontSize: 14 }}>
+            Invitation No: <strong>{item.invitationNumber || "—"}</strong>
+          </div>
+          <div className="muted" style={{ fontSize: 14 }}>
+            Tender Code: <strong>{item.tenderCode || "—"}</strong>
+          </div>
+        </div>
+        <a className="btn" href={item.detailUrl || "#"} target="_blank" rel="noreferrer">
+          Detail <ExternalLink size={16} />
+        </a>
+      </div>
+
+      <div className="meta-grid" style={{ marginTop: 16 }}>
+        <div className="softbox">
+          <div className="label">Approved budget</div>
+          <div style={{ fontWeight: 700, marginTop: 4 }}>{money(item.totalBudget)}</div>
+        </div>
+        <div className="softbox">
+          <div className="label">Year budget</div>
+          <div style={{ fontWeight: 700, marginTop: 4 }}>{money(item.yearBudget)}</div>
+        </div>
+        <div className="softbox">
+          <div className="label">Published</div>
+          <div style={{ fontWeight: 700, marginTop: 4 }}>{dateText(item.publishDate)}</div>
+        </div>
+        <div className="softbox">
+          <div className="label">Submission deadline</div>
+          <div style={{ fontWeight: 700, marginTop: 4 }}>{dateText(item.receiveDate)}</div>
+        </div>
+      </div>
+
+      <div className="meta-grid" style={{ marginTop: 16 }}>
+        <div className="softbox">
+          <div className="row-between" style={{ alignItems: "flex-start" }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Building2 size={16} style={{ marginTop: 2, color: "#94a3b8" }} />
+              <div>
+                <div className="label">Procuring entity</div>
+                <div style={{ fontWeight: 700, marginTop: 4 }}>{item.budgetEntityName || "—"}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="softbox">
+          <div style={{ display: "flex", gap: 10 }}>
+            <FileText size={16} style={{ marginTop: 2, color: "#94a3b8" }} />
+            <div>
+              <div className="label">Funding source</div>
+              <div style={{ fontWeight: 700, marginTop: 4 }}>{item.fundName || "—"}</div>
+            </div>
+          </div>
+        </div>
+        <div className="softbox">
+          <div style={{ display: "flex", gap: 10 }}>
+            <Calendar size={16} style={{ marginTop: 2, color: "#94a3b8" }} />
+            <div>
+              <div className="label">Opening date</div>
+              <div style={{ fontWeight: 700, marginTop: 4 }}>{dateText(item.openDate)}</div>
+            </div>
+          </div>
+        </div>
+        <div className="softbox">
+          <div style={{ display: "flex", gap: 10 }}>
+            <Globe size={16} style={{ marginTop: 2, color: "#94a3b8" }} />
+            <div>
+              <div className="label">Procedure / status</div>
+              <div style={{ fontWeight: 700, marginTop: 4 }}>
+                {[item.ruleName, item.docStatusName].filter(Boolean).join(" · ") || "—"}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="badges" style={{ marginTop: 14 }}>
+        <span className="badge">{item.isSimpleElectronic ? "Electronic" : "Mixed / not flagged electronic"}</span>
+        {item.budgetGovernorName ? <span className="badge">{item.budgetGovernorName}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+export default function TenderExplorer() {
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const [source, setSource] = useState<"" | "mock" | "open-api" | "public-html">("");
+  const [data, setData] = useState<TenderApiResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          year: String(year),
+          page: String(page),
+          perPage: String(PAGE_SIZE),
+          query
+        });
+        if (source) params.set("source", source);
+
+        const res = await fetch(`/api/tenders?${params.toString()}`);
+        if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+        const json = await res.json();
+        if (!cancelled) setData(json);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [year, page, query, source]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil((data?.total || 0) / PAGE_SIZE)), [data]);
+
+  return (
+    <div className="container">
+      <section className="hero">
+        <div className="label" style={{ color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.18em" }}>
+          English procurement intelligence
+        </div>
+        <h1 className="h1">Mongolia Tender Explorer</h1>
+        <p>
+          Clean English interface for Mongolia public procurement invitations, focused on 2019 onward, with a backend proxy
+          that can use the official API when a token is available and fall back to the public tender pages when needed.
+        </p>
+      </section>
+
+      <section className="stats">
+        <Stat label="Coverage" value="2019–2026" />
+        <Stat label="Page size" value="100" />
+        <Stat label="Language" value="English" />
+        <Stat label="Mode" value={data?.source || "auto"} />
+      </section>
+
+      <section className="panel" style={{ marginTop: 20 }}>
+        <div className="toolbar">
+          <h2 className="h3">Filters</h2>
+          <div className="muted" style={{ fontSize: 14 }}>
+            Auto mode tries official API first, then public HTML, then mock fallback.
+          </div>
+        </div>
+
+        <div className="filters" style={{ marginTop: 16 }}>
+          <label className="field">
+            <Calendar size={16} color="#94a3b8" />
+            <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setPage(1); }}>
+              {YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field" style={{ gridColumn: "span 2" }}>
+            <Search size={16} color="#94a3b8" />
+            <input
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              placeholder="Search title, code, or invitation number"
+            />
+          </label>
+
+          <label className="field">
+            <Filter size={16} color="#94a3b8" />
+            <select value={source} onChange={(e) => { setSource(e.target.value as typeof source); setPage(1); }}>
+              <option value="">Auto</option>
+              <option value="open-api">Official API</option>
+              <option value="public-html">Public HTML</option>
+              <option value="mock">Mock</option>
+            </select>
+          </label>
+        </div>
+
+        {data?.warning ? (
+          <div className="softbox" style={{ marginTop: 16 }}>
+            <strong>Note:</strong> {data.warning}
+          </div>
+        ) : null}
+      </section>
+
+      <section style={{ marginTop: 20 }}>
+        <div className="row-between" style={{ marginBottom: 12 }}>
+          <div>
+            <h2 className="h2">Tender results</h2>
+            <div className="muted" style={{ marginTop: 6 }}>
+              Page {page} of {totalPages} · total records: {data?.total ?? "—"}
+            </div>
+          </div>
+          <div className="pagination">
+            <button className="btn" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              <ChevronLeft size={16} /> Prev
+            </button>
+            <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+              Next <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        {loading ? <div className="panel">Loading…</div> : null}
+        {error ? <div className="panel">Error: {error}</div> : null}
+
+        <div className="results-grid">
+          {data?.items?.map((item) => <TenderCard key={item.id} item={item} />)}
+        </div>
+      </section>
+    </div>
+  );
+}

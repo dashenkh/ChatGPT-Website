@@ -1,0 +1,69 @@
+import { TenderApiResponse } from "./types";
+
+export const mockData = (year: number, page: number, perPage: number): TenderApiResponse => ({
+  total: 3,
+  page,
+  perPage,
+  year,
+  source: "mock",
+  warning: "Running in demo mode. Add a token or use the public HTML parser in the API route.",
+  items: [
+    {
+      id: "1611282173700",
+      invitationNumber: "DHIS/202102011/01/01",
+      tenderCode: "DHIS/202102011",
+      tenderName: "Medicines, medical products and hospital supplies",
+      budgetGovernorName: "General Budget Governor",
+      budgetEntityName: "National University of Internal Affairs",
+      tenderTypeName: "Goods",
+      fundName: "State Budget",
+      ruleName: "Open tender procedure",
+      totalBudget: 55872400,
+      yearBudget: 55872400,
+      publishDate: "2021-01-22",
+      receiveDate: "2021-02-15",
+      openDate: "2021-02-15",
+      isSimpleElectronic: true,
+      docStatusName: "Published",
+      detailUrl: "https://user.tender.gov.mn/en/invitation/detail/1611282173700"
+    },
+    {
+      id: "1689409065838",
+      invitationNumber: "BUAOSZDTG/202301002/01/01",
+      tenderCode: "BUAOSZDTG/202301002",
+      tenderName: "Continuous heating of clean water pipeline in khoroo",
+      budgetGovernorName: "Governor’s Office",
+      budgetEntityName: "Bayanzurkh district authority",
+      tenderTypeName: "Works",
+      fundName: "Local Development Fund",
+      ruleName: "Open tender procedure",
+      totalBudget: 224279200,
+      yearBudget: 224279200,
+      publishDate: "2023-09-15",
+      receiveDate: "2023-10-03",
+      openDate: "2023-10-03",
+      isSimpleElectronic: false,
+      docStatusName: "Result published",
+      detailUrl: "https://user.tender.gov.mn/en/invitation/detail/1689409065838"
+    },
+    {
+      id: "1723000000001",
+      invitationNumber: "MRT/202501020/03/01",
+      tenderCode: "MRT/202501020",
+      tenderName: "Road maintenance and winter support services",
+      budgetGovernorName: "Ministry level budget governor",
+      budgetEntityName: "Road Transport Development Center",
+      tenderTypeName: "Works",
+      fundName: "State Budget",
+      ruleName: "Open tender procedure",
+      totalBudget: 1450000000,
+      yearBudget: 750000000,
+      publishDate: "2025-03-02",
+      receiveDate: "2025-03-28",
+      openDate: "2025-03-28",
+      isSimpleElectronic: true,
+      docStatusName: "Published",
+      detailUrl: "https://user.tender.gov.mn/en/invitation/detail/1723000000001"
+    }
+  ]
+});
